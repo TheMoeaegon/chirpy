@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -46,6 +47,33 @@ func main() {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Hits reset" + strconv.FormatInt(int64(afgConfig.fileServerHits.Load()), 10)))
+	})
+
+	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
+		type paramters struct {
+			Body string `json:"body"`
+		}
+		params := paramters{}
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&params)
+		if err != nil {
+			log.Printf("Error decoding parameters: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+		if len(params.Body) > 140 {
+			responsdWithError(w, 400, "The chirpy is too long")
+			return
+		}
+		type validResponse struct {
+			CleanedBody string `json:"cleaned_body"`
+		}
+		//check for profane words
+		cleanedBody := validateBadWords(params.Body)
+		respBody := validResponse{
+			CleanedBody: cleanedBody,
+		}
+		respondWithJSON(w, 200, respBody)
 	})
 
 	fmt.Printf("Server running on port %v\n", server.Addr)
