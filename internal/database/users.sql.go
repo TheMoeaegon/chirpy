@@ -25,3 +25,12 @@ func (q *Queries) CreateUser(ctx context.Context, email string) (User, error) {
 	)
 	return i, err
 }
+
+const dropTable = `-- name: DropTable :exec
+DELETE FROM users
+`
+
+func (q *Queries) DropTable(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, dropTable)
+	return err
+}

@@ -7,10 +7,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
+	"strings"
 	"sync/atomic"
 
 	"github.com/Moee1149/chirpy/internal/database"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -31,6 +32,7 @@ func main() {
 	godotenv.Load()
 
 	dbUrl := os.Getenv("DB_URL")
+	platform := os.Getenv("PLATFORM")
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
 		log.Fatalf("Error Connection Database: %v", err)
@@ -60,38 +62,19 @@ func main() {
 	})
 	mux.HandleFunc("POST /admin/reset", func(w http.ResponseWriter, r *http.Request) {
 		apiConfig.fileServerHits.Store(0)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hits reset" + strconv.FormatInt(int64(apiConfig.fileServerHits.Load()), 10)))
-	})
-
-	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-		type paramters struct {
-			Body string `json:"body"`
-		}
-		params := paramters{}
-		decoder := json.NewDecoder(r.Body)
-		err := decoder.Decode(&params)
-		if err != nil {
-			log.Printf("Error decoding parameters: %s", err)
-			w.WriteHeader(500)
+		if strings.ToLower(platform) != "dev" {
+			responsdWithError(w, 403, "Forbidden")
 			return
 		}
-		if len(params.Body) > 140 {
-			responsdWithError(w, 400, "The chirpy is too long")
-			return
+		apiConfig.dbQueries.DropTable(r.Context())
+		type response struct {
+			Message string `json:"message"`
 		}
-		type validResponse struct {
-			CleanedBody string `json:"cleaned_body"`
+		msg := response{
+			Message: "Delete User Table",
 		}
-		//check for profane words
-		cleanedBody := validateBadWords(params.Body)
-		respBody := validResponse{
-			CleanedBody: cleanedBody,
-		}
-		respondWithJSON(w, 200, respBody)
+		respondWithJSON(w, 200, msg)
 	})
-
 	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
 		type parameters struct {
 			Email string `json:"email"`
@@ -126,6 +109,55 @@ func main() {
 			UPDATED_AT: user.UpdatedAt.String(),
 		}
 		respondWithJSON(w, 201, usr)
+	})
+	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		type parameters struct {
+			Body    string `json:"body"`
+			User_Id string `json:"user_id"`
+		}
+
+		params := parameters{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&params); err != nil {
+			respondWithJSON(w, 500, fmt.Sprintf("Error decoding json: %v", err))
+			return
+		}
+		if len(params.Body) > 140 {
+			responsdWithError(w, 400, "The chirpy is too long")
+			return
+		}
+		//check for profane words
+		cleanedBody := validateBadWords(params.Body)
+		userId, err := uuid.Parse(params.User_Id)
+		if err != nil {
+			responsdWithError(w, 400, "Invalid user_id format")
+			return
+		}
+		chirpsParams := database.CreateChirpyParams{
+			Body:   cleanedBody,
+			UserID: userId,
+		}
+
+		chirp, err := apiConfig.dbQueries.CreateChirpy(r.Context(), chirpsParams)
+		if err != nil {
+			responsdWithError(w, 500, fmt.Sprintf("Error adding chirps: %v", err))
+			return
+		}
+		resp := struct {
+			ID        string `json:"id"`
+			CreateAt  string `json:"created_at"`
+			UpdatedAt string `json:"updated_at"`
+			Body      string `json:"body"`
+			UserId    string `json:"UserId"`
+		}{
+			ID:        chirp.ID.String(),
+			CreateAt:  chirp.CreatedAt.UTC().Format("2006-01-0215:04:05Z"),
+			UpdatedAt: chirp.UpdatedAt.UTC().Format("2006-01-0215:04:05Z"),
+			Body:      chirp.Body,
+			UserId:    chirp.UserID.String(),
+		}
+		respondWithJSON(w, 201, resp)
+
 	})
 
 	fmt.Printf("Server running on port %v\n", server.Addr)
