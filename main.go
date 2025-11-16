@@ -28,6 +28,14 @@ func (cfg *apiConfig) middlewareMetrics(next http.Handler) http.Handler {
 	})
 }
 
+type chirpSchema struct {
+	ID        string `json:"id"`
+	CreateAt  string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+	Body      string `json:"body"`
+	UserId    string `json:"UserId"`
+}
+
 func main() {
 	godotenv.Load()
 
@@ -143,13 +151,7 @@ func main() {
 			responsdWithError(w, 500, fmt.Sprintf("Error adding chirps: %v", err))
 			return
 		}
-		resp := struct {
-			ID        string `json:"id"`
-			CreateAt  string `json:"created_at"`
-			UpdatedAt string `json:"updated_at"`
-			Body      string `json:"body"`
-			UserId    string `json:"UserId"`
-		}{
+		resp := chirpSchema{
 			ID:        chirp.ID.String(),
 			CreateAt:  chirp.CreatedAt.UTC().Format("2006-01-0215:04:05Z"),
 			UpdatedAt: chirp.UpdatedAt.UTC().Format("2006-01-0215:04:05Z"),
@@ -157,7 +159,14 @@ func main() {
 			UserId:    chirp.UserID.String(),
 		}
 		respondWithJSON(w, 201, resp)
-
+	})
+	mux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		chirps, err := apiConfig.dbQueries.GetAllChirps(r.Context())
+		if err != nil {
+			responsdWithError(w, 500, fmt.Sprintf("Error getting chirps: %v", err))
+			return
+		}
+		respondWithJSON(w, 200, chirps)
 	})
 
 	fmt.Printf("Server running on port %v\n", server.Addr)
