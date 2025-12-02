@@ -16,6 +16,7 @@ import (
 type apiConfig struct {
 	fileServerHits atomic.Int32
 	dbQueries      *database.Queries
+	jwtKey         string
 }
 
 func (cfg *apiConfig) middlewareMetrics(next http.Handler) http.Handler {
@@ -37,6 +38,7 @@ func main() {
 	godotenv.Load()
 
 	dbUrl := os.Getenv("DB_URL")
+	key := os.Getenv("JWT_KEY")
 	platform := os.Getenv("PLATFORM")
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
@@ -45,6 +47,7 @@ func main() {
 	dbQueries := database.New(db)
 	apiConfig := apiConfig{
 		dbQueries: dbQueries,
+		jwtKey:    key,
 	}
 	mux := http.NewServeMux()
 	server := &http.Server{

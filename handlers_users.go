@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Moee1149/chirpy/internal/auth"
 	"github.com/Moee1149/chirpy/internal/database"
@@ -65,8 +66,9 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password  string        `json:"password"`
+		Email     string        `json:"email"`
+		ExpiresIn time.Duration `json:"expires_in_second"`
 	}
 	params := parameters{}
 	decoder := json.NewDecoder(r.Body)
@@ -74,6 +76,11 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 		responsdWithError(w, 500, fmt.Sprintf("Error decoding body: %v", err))
 		return
 	}
+	if params.ExpiresIn == 0 || params.ExpiresIn > 3600 {
+		params.ExpiresIn = 3600
+	}
+	expiresDuration := params.ExpiresIn * time.Second
+
 	user, err := cfg.dbQueries.GetUserByEmail(r.Context(), params.Email)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -92,11 +99,21 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 		responsdWithError(w, 401, "Incorrect email or password")
 		return
 	}
-	usr := users{
-		ID:         user.ID.String(),
-		EMAIL:      user.Email,
-		CREATED_AT: user.CreatedAt.String(),
-		UPDATED_AT: user.UpdatedAt.String(),
+	token, err := auth.MakeJWT(user.ID, cfg.jwtKey, expiresDuration)
+	if err != nil {
+		responsdWithError(w, 500, fmt.Sprintf("Error creating token: %v", err))
+	}
+	usr := struct {
+		users
+		Token string `json:"token"`
+	}{
+		users: users{
+			ID:         user.ID.String(),
+			EMAIL:      user.Email,
+			CREATED_AT: user.CreatedAt.String(),
+			UPDATED_AT: user.UpdatedAt.String(),
+		},
+		Token: token,
 	}
 	respondWithJSON(w, 200, usr)
 }

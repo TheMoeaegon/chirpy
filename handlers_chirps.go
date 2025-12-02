@@ -5,11 +5,23 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Moee1149/chirpy/internal/auth"
 	"github.com/Moee1149/chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		responsdWithError(w, 400, err.Error())
+		return
+	}
+
+	_, err = auth.ValidateJwt(token, cfg.jwtKey)
+	if err != nil {
+		responsdWithError(w, 401, "Invalid Token")
+		return
+	}
 	type parameters struct {
 		Body    string `json:"body"`
 		User_Id string `json:"user_id"`
