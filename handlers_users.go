@@ -66,9 +66,8 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password  string        `json:"password"`
-		Email     string        `json:"email"`
-		ExpiresIn time.Duration `json:"expires_in_second"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 	params := parameters{}
 	decoder := json.NewDecoder(r.Body)
@@ -76,10 +75,7 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 		responsdWithError(w, 500, fmt.Sprintf("Error decoding body: %v", err))
 		return
 	}
-	if params.ExpiresIn == 0 || params.ExpiresIn > 3600 {
-		params.ExpiresIn = 3600
-	}
-	expiresDuration := params.ExpiresIn * time.Second
+	expiresDuration := 3600 * time.Second
 
 	user, err := cfg.dbQueries.GetUserByEmail(r.Context(), params.Email)
 	if err != nil {
@@ -99,13 +95,25 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 		responsdWithError(w, 401, "Incorrect email or password")
 		return
 	}
-	token, err := auth.MakeJWT(user.ID, cfg.jwtKey, expiresDuration)
+	accessToken, err := auth.MakeJWT(user.ID, cfg.jwtKey, expiresDuration)
 	if err != nil {
 		responsdWithError(w, 500, fmt.Sprintf("Error creating token: %v", err))
 	}
+
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		responsdWithError(w, 500, fmt.Sprintf("Error creating token: %v", err))
+	}
+	_ = database.InsertRefreshTokenParams{
+		Token:     accessToken,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(60 * time.Hour * 24),
+	}
+
 	usr := struct {
 		users
-		Token string `json:"token"`
+		AccessToken  string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}{
 		users: users{
 			ID:         user.ID.String(),
@@ -113,7 +121,8 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 			CREATED_AT: user.CreatedAt.String(),
 			UPDATED_AT: user.UpdatedAt.String(),
 		},
-		Token: token,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}
 	respondWithJSON(w, 200, usr)
 }
