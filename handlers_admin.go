@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/Moee1149/chirpy/internal/auth"
 )
 
 func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, r *http.Request) {
@@ -30,4 +32,21 @@ func (cfg *apiConfig) handleReset(platform string) http.HandlerFunc {
 		}
 		respondWithJSON(w, 200, msg)
 	}
+}
+
+func (cfg *apiConfig) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		responsdWithError(w, 400, err.Error())
+	}
+	refresh_token, err := cfg.dbQueries.GetToken(r.Context(), token)
+	if err != nil {
+		responsdWithError(w, 401, "Unauthorzied")
+	}
+	resp := struct {
+		TOKEN string `json:"token"`
+	}{
+		TOKEN: refresh_token.Token,
+	}
+	respondWithJSON(w, 200, resp)
 }

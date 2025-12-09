@@ -12,6 +12,24 @@ import (
 	"github.com/google/uuid"
 )
 
+const getToken = `-- name: GetToken :one
+SELECT token, created_at, updated_at, expires_at, revoked_at, user_id FROM refresh_tokens WHERE token = $1
+`
+
+func (q *Queries) GetToken(ctx context.Context, token string) (RefreshToken, error) {
+	row := q.db.QueryRowContext(ctx, getToken, token)
+	var i RefreshToken
+	err := row.Scan(
+		&i.Token,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.UserID,
+	)
+	return i, err
+}
+
 const insertRefreshToken = `-- name: InsertRefreshToken :one
 INSERT INTO refresh_tokens (token, user_id, expires_at)
 VALUES ($1, $2, $3) RETURNING token, created_at, updated_at, expires_at, revoked_at, user_id

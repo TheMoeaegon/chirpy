@@ -104,11 +104,13 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		responsdWithError(w, 500, fmt.Sprintf("Error creating token: %v", err))
 	}
-	_ = database.InsertRefreshTokenParams{
-		Token:     accessToken,
+	tokenPramas := database.InsertRefreshTokenParams{
+		Token:     refreshToken,
 		UserID:    user.ID,
 		ExpiresAt: time.Now().Add(60 * time.Hour * 24),
 	}
+
+	_, err = cfg.dbQueries.InsertRefreshToken(r.Context(), tokenPramas)
 
 	usr := struct {
 		users
