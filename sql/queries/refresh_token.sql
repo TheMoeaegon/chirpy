@@ -4,3 +4,6 @@ VALUES ($1, $2, $3) RETURNING *;
 
 -- name: GetToken :one
 SELECT * FROM refresh_tokens WHERE token = $1;
+
+-- name: RevokeToken :one
+UPDATE refresh_tokens SET revoked_at = NOW() WHERE token = $1 RETURNING *;

@@ -65,6 +65,7 @@ func main() {
 	mux.HandleFunc("GET /api/chirps", apiConfig.handleGetChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiConfig.handleGetChirpsById)
 	mux.HandleFunc("POST /api/refresh", apiConfig.handleRefreshToken)
+	mux.HandleFunc("POST /api/revoke", apiConfig.hanldeRevokeToken)
 
 	fmt.Printf("Server running on port %v\n", server.Addr)
 

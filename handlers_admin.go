@@ -1,9 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Moee1149/chirpy/internal/auth"
 )
@@ -35,18 +37,49 @@ func (cfg *apiConfig) handleReset(platform string) http.HandlerFunc {
 }
 
 func (cfg *apiConfig) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
-	token, err := auth.GetBearerToken(r.Header)
+	refreshToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		responsdWithError(w, 400, err.Error())
 	}
-	refresh_token, err := cfg.dbQueries.GetToken(r.Context(), token)
+	refresh_token, err := cfg.dbQueries.GetToken(r.Context(), refreshToken)
+	if err == sql.ErrNoRows {
+		responsdWithError(w, 401, "Unauthorized: token not found")
+		return
+	}
 	if err != nil {
-		responsdWithError(w, 401, "Unauthorzied")
+		responsdWithError(w, 500, "Internal Server Error")
+		return
+	}
+	if time.Now().After(refresh_token.ExpiresAt) {
+		responsdWithError(w, 401, "Unauthorized: token expired")
+		return
+	}
+	token, err := auth.MakeJWT(refresh_token.UserID, cfg.jwtKey, 3600*time.Second)
+	if err != nil {
+		responsdWithError(w, 500, "Internal Server Error")
+		return
 	}
 	resp := struct {
 		TOKEN string `json:"token"`
 	}{
-		TOKEN: refresh_token.Token,
+		TOKEN: token,
 	}
 	respondWithJSON(w, 200, resp)
+}
+
+func (cfg *apiConfig) hanldeRevokeToken(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		responsdWithError(w, 400, err.Error())
+	}
+	_, err = cfg.dbQueries.RevokeToken(r.Context(), refreshToken)
+	if err == sql.ErrNoRows {
+		responsdWithError(w, 401, "Unauthorized: token not found")
+		return
+	}
+	if err != nil {
+		responsdWithError(w, 500, "Internal Server Error")
+		return
+	}
+	respondWithJSON(w, 204, struct{}{})
 }
