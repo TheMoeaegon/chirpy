@@ -128,3 +128,52 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	respondWithJSON(w, 200, usr)
 }
+
+func (cfg *apiConfig) handleUpdateUserInfo(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		responsdWithError(w, 401, err.Error())
+		return
+	}
+	userId, err := auth.ValidateJwt(token, cfg.jwtKey)
+	if err != nil {
+		responsdWithError(w, 401, err.Error())
+		return
+	}
+	type paramters struct {
+		EMAIL    string `json:"email"`
+		PASSWORD string `json:"password"`
+	}
+	parmas := paramters{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&parmas); err != nil {
+		responsdWithError(w, 500, "Internal Server Error")
+		return
+	}
+	if parmas.EMAIL == "" || parmas.PASSWORD == "" {
+		responsdWithError(w, 400, "Bad Request")
+		return
+	}
+	hashedPassword, err := auth.HashPassword(parmas.PASSWORD)
+	if err != nil {
+		responsdWithError(w, 500, "Internal Server Error")
+		return
+	}
+	userUpdateParams := database.UpdateUserByIdParams{
+		ID:             userId,
+		Email:          parmas.EMAIL,
+		HashedPassword: hashedPassword,
+	}
+	user, err := cfg.dbQueries.UpdateUserById(r.Context(), userUpdateParams)
+	if err != nil {
+		responsdWithError(w, 500, "Internal Server Error")
+		return
+	}
+	usr := users{
+		ID:         user.ID.String(),
+		EMAIL:      user.Email,
+		UPDATED_AT: user.UpdatedAt.String(),
+		CREATED_AT: user.CreatedAt.String(),
+	}
+	respondWithJSON(w, 200, usr)
+}

@@ -59,13 +59,16 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", handleHealthz)
 	mux.HandleFunc("GET /admin/metrics", apiConfig.handleMetrics)
 	mux.HandleFunc("POST /admin/reset", apiConfig.handleReset(platform))
+	mux.HandleFunc("POST /api/refresh", apiConfig.handleRefreshToken)
+	mux.HandleFunc("POST /api/revoke", apiConfig.hanldeRevokeToken)
+
 	mux.HandleFunc("POST /api/users", apiConfig.handleCreateUser)
+	mux.HandleFunc("PUT /api/users", apiConfig.handleUpdateUserInfo)
 	mux.HandleFunc("POST /api/login", apiConfig.handleUserLogin)
+
 	mux.HandleFunc("POST /api/chirps", apiConfig.handleCreateChirps)
 	mux.HandleFunc("GET /api/chirps", apiConfig.handleGetChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiConfig.handleGetChirpsById)
-	mux.HandleFunc("POST /api/refresh", apiConfig.handleRefreshToken)
-	mux.HandleFunc("POST /api/revoke", apiConfig.hanldeRevokeToken)
 
 	fmt.Printf("Server running on port %v\n", server.Addr)
 
