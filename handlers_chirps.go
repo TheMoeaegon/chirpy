@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -93,4 +94,56 @@ func (cfg *apiConfig) handleGetChirpsById(w http.ResponseWriter, r *http.Request
 		UserId:    chirp.UserID.String(),
 	}
 	respondWithJSON(w, 200, resp)
+}
+
+func (cfg *apiConfig) handleDeleteChirps(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		responsdWithError(w, 401, err.Error())
+		return
+	}
+	user_id, err := auth.ValidateJwt(token, cfg.jwtKey)
+	if err != nil {
+		responsdWithError(w, 401, err.Error())
+		return
+	}
+	pathValue := r.PathValue("chirpID")
+	chirpId, err := uuid.Parse(pathValue)
+	if err != nil {
+		responsdWithError(w, 400, "Invalid chirp_id format")
+		return
+	}
+	chirp, err := cfg.dbQueries.GetChirpsById(r.Context(), chirpId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			responsdWithError(w, 404, "Chirp not found")
+			return
+		}
+		responsdWithError(w, 500, "An Unknow error occured")
+		return
+	}
+	params := database.DeleteChirpByIdParams{
+		ID:     chirp.ID,
+		UserID: user_id,
+	}
+	result, err := cfg.dbQueries.DeleteChirpById(r.Context(), params)
+	if err != nil {
+		responsdWithError(w, 500, "Internal Server Error")
+		return
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		responsdWithError(w, 500, "Internal Server Error")
+		return
+	}
+	if rowsAffected == 0 {
+		responsdWithError(w, 403, "")
+		return
+	}
+	resp := struct {
+		MESSAGE string `json:"message"`
+	}{
+		MESSAGE: "chirp deleted successfully",
+	}
+	respondWithJSON(w, 204, resp)
 }

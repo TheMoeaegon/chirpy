@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 )
@@ -32,6 +33,19 @@ func (q *Queries) CreateChirpy(ctx context.Context, arg CreateChirpyParams) (Chi
 		&i.UserID,
 	)
 	return i, err
+}
+
+const deleteChirpById = `-- name: DeleteChirpById :execresult
+DELETE FROM chirps WHERE id = $1 AND user_id=$2
+`
+
+type DeleteChirpByIdParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteChirpById(ctx context.Context, arg DeleteChirpByIdParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteChirpById, arg.ID, arg.UserID)
 }
 
 const dropChirpsTable = `-- name: DropChirpsTable :exec
