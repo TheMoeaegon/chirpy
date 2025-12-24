@@ -71,6 +71,9 @@ func main() {
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiConfig.handleGetChirpsById)
 	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiConfig.handleDeleteChirps)
 
+	//webhooks
+	mux.HandleFunc("POST /api/polka/webhooks", apiConfig.handleUpdateUserToChirpyRed)
+
 	fmt.Printf("Server running on port %v\n", server.Addr)
 
 	err = server.ListenAndServe()

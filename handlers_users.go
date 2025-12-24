@@ -10,13 +10,15 @@ import (
 
 	"github.com/Moee1149/chirpy/internal/auth"
 	"github.com/Moee1149/chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
 type users struct {
-	ID         string `json:"id"`
-	EMAIL      string `json:"email"`
-	UPDATED_AT string `json:"updated_at"`
-	CREATED_AT string `json:"created_at"`
+	ID            string `json:"id"`
+	EMAIL         string `json:"email"`
+	UPDATED_AT    string `json:"updated_at"`
+	CREATED_AT    string `json:"created_at"`
+	IS_CHIRPY_RED bool   `json:"is_chirpy_red"`
 }
 
 func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -118,10 +120,11 @@ func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 		RefreshToken string `json:"refresh_token"`
 	}{
 		users: users{
-			ID:         user.ID.String(),
-			EMAIL:      user.Email,
-			CREATED_AT: user.CreatedAt.String(),
-			UPDATED_AT: user.UpdatedAt.String(),
+			ID:            user.ID.String(),
+			EMAIL:         user.Email,
+			CREATED_AT:    user.CreatedAt.String(),
+			UPDATED_AT:    user.UpdatedAt.String(),
+			IS_CHIRPY_RED: user.IsChirpyRed,
 		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -170,10 +173,51 @@ func (cfg *apiConfig) handleUpdateUserInfo(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	usr := users{
-		ID:         user.ID.String(),
-		EMAIL:      user.Email,
-		UPDATED_AT: user.UpdatedAt.String(),
-		CREATED_AT: user.CreatedAt.String(),
+		ID:            user.ID.String(),
+		EMAIL:         user.Email,
+		UPDATED_AT:    user.UpdatedAt.String(),
+		CREATED_AT:    user.CreatedAt.String(),
+		IS_CHIRPY_RED: user.IsChirpyRed,
 	}
 	respondWithJSON(w, 200, usr)
+}
+
+func (cfg *apiConfig) handleUpdateUserToChirpyRed(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		EVENT string `json:"event"`
+		DATA  struct {
+			USER_ID string `json:"user_id"`
+		}
+	}
+	params := parameters{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&params); err != nil {
+		responsdWithError(w, 500, fmt.Sprintf("Error decoding body: %v", err))
+		return
+	}
+
+	if params.EVENT != "user.upgraded" {
+		respondWithJSON(w, 204, struct{}{})
+		return
+	}
+	userId, err := uuid.Parse(params.DATA.USER_ID)
+	if err != nil {
+		responsdWithError(w, 500, "Internal server error")
+		return
+	}
+
+	dbParams := database.UpdateUserToChirpyRedParams{
+		ID:          userId,
+		IsChirpyRed: true,
+	}
+	_, err = cfg.dbQueries.UpdateUserToChirpyRed(r.Context(), dbParams)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			responsdWithError(w, 404, "User Not Found")
+			return
+		}
+		responsdWithError(w, 500, "Internal Server error")
+		return
+	}
+	respondWithJSON(w, 204, struct{}{})
 }
