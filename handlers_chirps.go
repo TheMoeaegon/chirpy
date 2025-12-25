@@ -66,12 +66,27 @@ func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request)
 }
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.dbQueries.GetAllChirps(r.Context())
-	if err != nil {
-		responsdWithError(w, 500, fmt.Sprintf("Error getting chirps: %v", err))
-		return
+	author_id := r.URL.Query().Get("author_id")
+	if author_id != "" {
+		user_id, err := uuid.Parse(author_id)
+		if err != nil {
+			responsdWithError(w, 400, err.Error())
+			return
+		}
+		chirps, err := cfg.dbQueries.GetChirpsByAuthorId(r.Context(), user_id)
+		if err != nil {
+			responsdWithError(w, 500, fmt.Sprintf("Error getting chirps: %v", err))
+			return
+		}
+		respondWithJSON(w, 200, chirps)
+	} else {
+		chirps, err := cfg.dbQueries.GetAllChirps(r.Context())
+		if err != nil {
+			responsdWithError(w, 500, fmt.Sprintf("Error getting chirps: %v", err))
+			return
+		}
+		respondWithJSON(w, 200, chirps)
 	}
-	respondWithJSON(w, 200, chirps)
 }
 
 func (cfg *apiConfig) handleGetChirpsById(w http.ResponseWriter, r *http.Request) {

@@ -17,6 +17,7 @@ type apiConfig struct {
 	fileServerHits atomic.Int32
 	dbQueries      *database.Queries
 	jwtKey         string
+	polkaKey       string
 }
 
 func (cfg *apiConfig) middlewareMetrics(next http.Handler) http.Handler {
@@ -40,6 +41,7 @@ func main() {
 	dbUrl := os.Getenv("DB_URL")
 	key := os.Getenv("JWT_KEY")
 	platform := os.Getenv("PLATFORM")
+	polka_key := os.Getenv("POLKA_KEY")
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
 		log.Fatalf("Error Connection Database: %v", err)
@@ -48,6 +50,7 @@ func main() {
 	apiConfig := apiConfig{
 		dbQueries: dbQueries,
 		jwtKey:    key,
+		polkaKey:  polka_key,
 	}
 	mux := http.NewServeMux()
 	server := &http.Server{

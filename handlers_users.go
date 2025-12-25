@@ -183,6 +183,15 @@ func (cfg *apiConfig) handleUpdateUserInfo(w http.ResponseWriter, r *http.Reques
 }
 
 func (cfg *apiConfig) handleUpdateUserToChirpyRed(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		responsdWithError(w, 400, err.Error())
+		return
+	}
+	if apiKey != cfg.polkaKey {
+		responsdWithError(w, 401, "Unauthorized")
+		return
+	}
 	type parameters struct {
 		EVENT string `json:"event"`
 		DATA  struct {
