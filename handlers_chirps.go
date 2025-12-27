@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/Moee1149/chirpy/internal/auth"
 	"github.com/Moee1149/chirpy/internal/database"
@@ -67,6 +68,7 @@ func (cfg *apiConfig) handleCreateChirps(w http.ResponseWriter, r *http.Request)
 
 func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 	author_id := r.URL.Query().Get("author_id")
+	sort_by := r.URL.Query().Get("sort")
 	if author_id != "" {
 		user_id, err := uuid.Parse(author_id)
 		if err != nil {
@@ -78,12 +80,30 @@ func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
 			responsdWithError(w, 500, fmt.Sprintf("Error getting chirps: %v", err))
 			return
 		}
+		if sort_by == "desc" {
+			sort.Slice(chirps, func(i, j int) bool {
+				return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+			})
+		} else {
+			sort.Slice(chirps, func(i, j int) bool {
+				return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+			})
+		}
 		respondWithJSON(w, 200, chirps)
 	} else {
 		chirps, err := cfg.dbQueries.GetAllChirps(r.Context())
 		if err != nil {
 			responsdWithError(w, 500, fmt.Sprintf("Error getting chirps: %v", err))
 			return
+		}
+		if sort_by == "desc" {
+			sort.Slice(chirps, func(i, j int) bool {
+				return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+			})
+		} else {
+			sort.Slice(chirps, func(i, j int) bool {
+				return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+			})
 		}
 		respondWithJSON(w, 200, chirps)
 	}
